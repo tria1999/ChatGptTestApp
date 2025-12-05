@@ -36,7 +36,20 @@ The MCP servers in this demo highlight how each tool can light up widgets by com
 - `pizzaz_server_node/` – MCP server implemented with the official TypeScript SDK.
 - `pizzaz_server_python/` – Python MCP server that returns the Pizzaz widgets.
 - `solar-system_server_python/` – Python MCP server for the 3D solar system widget.
+- `kitchen_sink_server_node/` – Node MCP server for the kitchen-sink-lite widget.
+- `kitchen_sink_server_python/` – Python MCP server for the kitchen-sink-lite widget.
 - `build-all.mts` – Vite build orchestrator that produces hashed bundles for every widget entrypoint.
+
+### Kitchen sink lite overview
+
+The kitchen sink lite sample shows the full `window.openai` surface working together:
+
+- Reads host state (`toolInput`, `toolOutput`, `displayMode`, `theme`, `widgetState`).
+- Writes host state with `setWidgetState`.
+- Calls another MCP tool from the widget with `callTool`.
+- Uses host helpers like `requestDisplayMode`, `openExternal`, and `sendFollowUpMessage`.
+
+Use it as a reference for how to wire UI to MCP tool responses and host APIs with the Apps SDK UI components.
 
 ## Prerequisites
 
@@ -90,6 +103,7 @@ The repository ships several demo MCP servers that highlight different widget bu
 
 - **Pizzaz (Node & Python)** – pizza-inspired collection of tools and components
 - **Solar system (Python)** – 3D solar system viewer
+- **Kitchen sink lite (Node & Python)** – minimal widget + server pairing that demonstrates tool output, widget state, `callTool`, and host helpers
 
 ### Pizzaz Node server
 
@@ -114,6 +128,21 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r solar-system_server_python/requirements.txt
 uvicorn solar-system_server_python.main:app --port 8000
+```
+
+### Kitchen sink lite Node server
+
+```bash
+pnpm --filter kitchen-sink-mcp-node start
+```
+
+### Kitchen sink lite Python server
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r kitchen_sink_server_python/requirements.txt
+uvicorn kitchen_sink_server_python.main:app --port 8000
 ```
 
 You can reuse the same virtual environment for all Python servers—install the dependencies once and run whichever entry point you need.
