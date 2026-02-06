@@ -27,6 +27,7 @@ const targets: string[] = [
   "kitchen-sink-lite",
   "shopping-cart",
   "hotel-availability",
+  "hotel-availability-list",
 ];
 const builtNames: string[] = [];
 

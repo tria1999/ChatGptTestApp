@@ -97,10 +97,10 @@ const widgets: HotelAvailabilityWidget[] = [
   {
     id: "hotel-availability-search",
     title: "Search Hotel Availability",
-    templateUri: "ui://widget/hotel-availability.html",
+    templateUri: "ui://widget/hotel-availability-list.html",
     invoking: "Searching for available rooms",
     invoked: "Found hotel availability",
-    html: readWidgetHtml("hotel-availability"),
+    html: readWidgetHtml("hotel-availability-list"),
     responseText: "Hotel availability search completed!",
   },
 ];
@@ -172,6 +172,146 @@ const toolInputSchema = {
   additionalProperties: false,
 } as const;
 
+// Multi-property availability schema
+const multiPropertyInputSchema = {
+  type: "object",
+  properties: {
+    username: {
+      type: "string",
+      description: "WebHotelier API username",
+    },
+    password: {
+      type: "string",
+      description: "WebHotelier API password",
+    },
+    checkin: {
+      type: "string",
+      description: "Check-in date in ISO 8601 format (YYYY-MM-DD)",
+    },
+    checkout: {
+      type: "string",
+      description: "Check-out date in ISO 8601 format (YYYY-MM-DD). Optional if nights is provided.",
+    },
+    nights: {
+      type: "number",
+      description: "Number of nights (1-30). Optional if checkout is provided.",
+      minimum: 1,
+      maximum: 30,
+    },
+    // Geolocation - one of these is required
+    location: {
+      type: "string",
+      description: "Location text for geocoding (e.g., 'Santorini', 'Athens')",
+    },
+    properties: {
+      type: "string",
+      description: "Comma-separated list of property codes (up to 300)",
+    },
+    lat: {
+      type: "number",
+      description: "Latitude for radius search (-90 to 90)",
+    },
+    lon: {
+      type: "number",
+      description: "Longitude for radius search (-180 to 180)",
+    },
+    radius: {
+      type: "number",
+      description: "Search radius in kilometers (1-100). Required when using lat/lon.",
+      minimum: 1,
+      maximum: 100,
+    },
+    // Bounding box
+    lat1: {
+      type: "number",
+      description: "Bottom-left latitude for bounding box search",
+    },
+    lon1: {
+      type: "number",
+      description: "Bottom-left longitude for bounding box search",
+    },
+    lat2: {
+      type: "number",
+      description: "Top-right latitude for bounding box search",
+    },
+    lon2: {
+      type: "number",
+      description: "Top-right longitude for bounding box search",
+    },
+    region: {
+      type: "string",
+      description: "ISO 3166-1-alpha-2 region code for geocoding bias (e.g., 'GR', 'US')",
+    },
+    // Occupancy
+    adults: {
+      type: "number",
+      description: "Number of adults per room (optional)",
+      minimum: 1,
+    },
+    children: {
+      type: "number",
+      description: "Number of children per room (optional)",
+      minimum: 0,
+    },
+    rooms: {
+      type: "number",
+      description: "Number of rooms (optional)",
+      minimum: 1,
+      maximum: 5,
+    },
+    // Filters
+    name: {
+      type: "string",
+      description: "Property name filter (supports substring search)",
+    },
+    rating: {
+      type: "string",
+      description: "Filter by rating/stars (e.g., '5' or '3,4,5')",
+    },
+    board: {
+      type: "string",
+      description: "Filter by board type (e.g., '19' or '3,19,21')",
+    },
+    // Output settings
+    sort_by: {
+      type: "string",
+      description: "Sort results by: DISTANCE, NAME, POPULARITY, or PRICE",
+      enum: ["DISTANCE", "NAME", "POPULARITY", "PRICE"],
+    },
+    sort_order: {
+      type: "string",
+      description: "Sort order: ASC or DESC",
+      enum: ["ASC", "DESC"],
+    },
+    max_properties: {
+      type: "number",
+      description: "Maximum properties to return (recommended: 50 or lower)",
+    },
+    max_rates: {
+      type: "number",
+      description: "Maximum rates per property (recommended: 3 or lower)",
+    },
+    max_room_rates: {
+      type: "number",
+      description: "Maximum rates per room type (recommended: 1)",
+    },
+    no_policies: {
+      type: "boolean",
+      description: "Do not include rate policies in response",
+    },
+    include_noavl: {
+      type: "boolean",
+      description: "Include properties with no availability",
+    },
+    payments: {
+      type: "boolean",
+      description: "Include payments and cancellation fees",
+    },
+  },
+  required: ["username", "password", "checkin"],
+  additionalProperties: false,
+} as const;
+
 const toolInputParser = z.object({
   username: z.string(),
   password: z.string(),
@@ -184,6 +324,42 @@ const toolInputParser = z.object({
   rooms: z.number().min(1).max(5).optional(),
   breakdown: z.boolean().optional(),
   offline: z.boolean().optional(),
+});
+
+const multiPropertyInputParser = z.object({
+  username: z.string(),
+  password: z.string(),
+  checkin: z.string(),
+  checkout: z.string().optional(),
+  nights: z.number().min(1).max(30).optional(),
+  // Geolocation
+  location: z.string().optional(),
+  properties: z.string().optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lon: z.number().min(-180).max(180).optional(),
+  radius: z.number().min(1).max(100).optional(),
+  lat1: z.number().min(-90).max(90).optional(),
+  lon1: z.number().min(-180).max(180).optional(),
+  lat2: z.number().min(-90).max(90).optional(),
+  lon2: z.number().min(-180).max(180).optional(),
+  region: z.string().optional(),
+  // Occupancy
+  adults: z.number().min(1).optional(),
+  children: z.number().min(0).optional(),
+  rooms: z.number().min(1).max(5).optional(),
+  // Filters
+  name: z.string().optional(),
+  rating: z.string().optional(),
+  board: z.string().optional(),
+  // Output settings
+  sort_by: z.enum(["DISTANCE", "NAME", "POPULARITY", "PRICE"]).optional(),
+  sort_order: z.enum(["ASC", "DESC"]).optional(),
+  max_properties: z.number().optional(),
+  max_rates: z.number().optional(),
+  max_room_rates: z.number().optional(),
+  no_policies: z.boolean().optional(),
+  include_noavl: z.boolean().optional(),
+  payments: z.boolean().optional(),
 });
 
 async function fetchHotelAvailability(
@@ -250,7 +426,7 @@ async function fetchHotelAvailability(
   
   console.log(`Response status: ${response.status}`);
   
-  const data = await response.json();
+  const data = await response.json() as { error_code?: string; error_msg?: string; http_code?: number; data?: unknown };
   console.log(`Response data:`, JSON.stringify(data, null, 2));
   
   // Check for authentication failure
@@ -268,7 +444,149 @@ async function fetchHotelAvailability(
   return data;
 }
 
-const tools: Tool[] = widgets.map((widget) => ({
+async function fetchMultiPropertyAvailability(
+  params: z.infer<typeof multiPropertyInputParser>
+) {
+  // Create credentials from username and password
+  const credentials = Buffer.from(`${params.username}:${params.password}`).toString("base64");
+  
+  const queryParams = new URLSearchParams();
+  
+  // checkin is required
+  queryParams.append("checkin", params.checkin);
+  
+  // checkout or nights
+  if (params.checkout) {
+    queryParams.append("checkout", params.checkout);
+  } else if (params.nights) {
+    queryParams.append("nights", params.nights.toString());
+  }
+  
+  // Geolocation parameters (mutually exclusive: properties > location > coordinates)
+  if (params.properties) {
+    queryParams.append("properties", params.properties);
+  } else if (params.location) {
+    queryParams.append("location", params.location);
+    if (params.region) {
+      queryParams.append("region", params.region);
+    }
+  } else if (params.lat !== undefined && params.lon !== undefined) {
+    queryParams.append("lat", params.lat.toString());
+    queryParams.append("lon", params.lon.toString());
+    if (params.radius) {
+      queryParams.append("radius", params.radius.toString());
+    }
+  }
+  
+  // Bounding box
+  if (params.lat1 !== undefined && params.lon1 !== undefined && 
+      params.lat2 !== undefined && params.lon2 !== undefined) {
+    queryParams.append("lat1", params.lat1.toString());
+    queryParams.append("lon1", params.lon1.toString());
+    queryParams.append("lat2", params.lat2.toString());
+    queryParams.append("lon2", params.lon2.toString());
+  }
+  
+  // Occupancy
+  if (params.adults && params.adults > 0) {
+    queryParams.append("adults", params.adults.toString());
+  }
+  if (params.children && params.children > 0) {
+    queryParams.append("children", params.children.toString());
+  }
+  if (params.rooms && params.rooms > 0) {
+    queryParams.append("rooms", params.rooms.toString());
+  }
+  
+  // Filters
+  if (params.name) {
+    queryParams.append("name", params.name);
+  }
+  if (params.rating) {
+    queryParams.append("rating", params.rating);
+  }
+  if (params.board) {
+    queryParams.append("board", params.board);
+  }
+  
+  // Output settings
+  if (params.sort_by) {
+    queryParams.append("sort_by", params.sort_by);
+  }
+  if (params.sort_order) {
+    queryParams.append("sort_order", params.sort_order);
+  }
+  if (params.max_properties) {
+    queryParams.append("max_properties", params.max_properties.toString());
+  }
+  if (params.max_rates) {
+    queryParams.append("max_rates", params.max_rates.toString());
+  }
+  if (params.max_room_rates) {
+    queryParams.append("max_room_rates", params.max_room_rates.toString());
+  }
+  if (params.no_policies) {
+    queryParams.append("no_policies", "1");
+  }
+  if (params.include_noavl) {
+    queryParams.append("include_noavl", "1");
+  }
+  if (params.payments) {
+    queryParams.append("payments", "1");
+  }
+
+  // URL format: /availability?checkin=...&checkout=...&location=...
+  const url = `${API_BASE_URL}/availability?${queryParams.toString()}`;
+  
+  console.log(`Fetching multi-property availability from: ${url}`);
+  console.log(`Request params:`, JSON.stringify(params, null, 2));
+  
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Authorization": `Basic ${credentials}`,
+      "Accept": "application/json",
+    },
+  });
+  
+  console.log(`Response status: ${response.status}`);
+  
+  const data = await response.json() as { error_code?: string; error_msg?: string; http_code?: number; data?: { hotels?: unknown[] } };
+  console.log(`Response data:`, JSON.stringify(data, null, 2));
+  
+  // Check for authentication failure
+  if (response.status === 401) {
+    throw new Error("Authentication failed. Please check your credentials.");
+  }
+  
+  if (response.status === 403) {
+    throw new Error(`Access forbidden: ${data.error_msg || "Invalid credentials or quota exceeded"}`);
+  }
+  
+  // WebHotelier API returns HTTP 200 even on errors - check error_code field
+  if (data.error_code && data.error_code !== "OK" && data.error_code !== "NO_AVAILABILITY" && data.error_code !== "NO_HOTELS_FOUND") {
+    throw new Error(`API error: ${data.error_msg || data.error_code} (HTTP ${data.http_code || response.status})`);
+  }
+  
+  console.log(`Successfully fetched multi-property availability`);
+  
+  return data;
+}
+
+// Multi-property search tool
+const multiPropertyTool: Tool = {
+  name: "multi-property-availability-search",
+  description: "Search availability across multiple properties by location, coordinates, or property codes. Returns a list of available properties with pricing.",
+  inputSchema: multiPropertyInputSchema,
+  title: "Multi-Property Availability Search",
+  annotations: {
+    destructiveHint: false,
+    openWorldHint: false,
+    readOnlyHint: true,
+  },
+};
+
+const widgetTools: Tool[] = widgets.map((widget) => ({
   name: widget.id,
   description: widget.title,
   inputSchema: toolInputSchema,
@@ -281,6 +599,8 @@ const tools: Tool[] = widgets.map((widget) => ({
     readOnlyHint: true,
   },
 }));
+
+const tools: Tool[] = [multiPropertyTool, ...widgetTools];
 
 const resources: Resource[] = widgets.map((widget) => ({
   uri: widget.templateUri,
@@ -358,10 +678,57 @@ function createHotelAvailabilityServer(): Server {
   server.setRequestHandler(
     CallToolRequestSchema,
     async (request: CallToolRequest) => {
-      const widget = widgetsById.get(request.params.name);
+      const toolName = request.params.name;
+
+      // Handle multi-property availability search
+      if (toolName === "multi-property-availability-search") {
+        const args = multiPropertyInputParser.parse(request.params.arguments ?? {});
+
+        let data;
+        try {
+          data = await fetchMultiPropertyAvailability(args);
+        } catch (error) {
+          console.error("Error fetching multi-property availability:", error);
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error fetching multi-property availability: ${error instanceof Error ? error.message : "Unknown error"}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const hotelCount = data.data?.hotels?.length ?? 0;
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Found ${hotelCount} properties with availability.`,
+            },
+          ],
+          structuredContent: {
+            searchParams: {
+              checkin: args.checkin,
+              checkout: args.checkout,
+              nights: args.nights,
+              location: args.location,
+              properties: args.properties,
+              adults: args.adults,
+              children: args.children,
+              rooms: args.rooms,
+            },
+            data,
+          },
+        };
+      }
+
+      // Handle single-property widget tools
+      const widget = widgetsById.get(toolName);
 
       if (!widget) {
-        throw new Error(`Unknown tool: ${request.params.name}`);
+        throw new Error(`Unknown tool: ${toolName}`);
       }
 
       const args = toolInputParser.parse(request.params.arguments ?? {});
